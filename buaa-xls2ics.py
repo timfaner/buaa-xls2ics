@@ -1,7 +1,7 @@
 import re, xlrd, ics, arrow
 
 
-v1 = r'(?P<class_name>[\w\（\）\(\)]+)◇(?P<teacher>[\w\s\，\,]*)\[(?P<repeat>[\w\-\－\，\,]+)\]◇?(?P<place_and_time>[\w\，\,]+)'
+v1 = r'(?P<class_name>[\w\（\）\(\)]+)◇(?P<teacher>[\w\s\，\,]*)\[(?P<repeat>[\w\-\－\，\,]+)\]◇?(?P<place_and_time>[\w\，\,\(,\),\（,\）]+)'
 re_class = re.compile(v1)
 
 v2 = r'[\,\，\s]+'
@@ -11,9 +11,9 @@ v3 = r'[\n\t|\<\/br\>]+'
 re_celisplit = re.compile(v3)
 
 v4 = r'(\d+)[\-\－]?(\d*)'
-re_repeat.compile(v4)
+re_repeat = re.compile(v4)
 
-session_begin_time = arrow.get('2017-09-17T08:00:00+08:00')
+session_begin_time = arrow.get('2017-09-18T08:00:00+08:00')
 
 xueyuanlu_time = {\
     1 : (8, 00), \
@@ -59,86 +59,101 @@ class ClassInfoHandle:
         else:
             self.class_room = ''
             self.time_str = redict['place_and_time'][di_index+1:jie_index]
-        self.__time = re_timesplit.split(self.time_str)
-        self.__time = list(map(int, self.time))
-        self.time.extend(self.__time)
+        self._time = re_timesplit.split(self.time_str)
+        self._time = list(map(int, self._time))
+        self.time.extend(self._time)
+        self._repeat = None
+        self.rrule = None
 
-    def getRepeat(self):
-        repeat = [0,0,0]#从几周到几周，间隔几周
+
+        self._repeat = list(re_repeat.match(self.repeat).groups())
+        if self._repeat[-1] == '':
+            self._repeat.remove('')
+        self._repeat = list(map(int, self._repeat))
 
         if not self.repeat.find('双周') == -1:
-            l = list(map(int,re_repeat.match(self.repeat).groups()))
-            l.append(2)
-            repeat = l.copy()
+            self._repeat.append(2)
+            self._repeat[0] += 1 if self._repeat[0] % 2 == 1 else 0
+            self._repeat[1] -= 1 if self._repeat[1] % 2 == 1 else 0
+        elif not self.repeat.find('单周') == -1:
+            self._repeat.append(2)
+            self._repeat[0] += 1 if self._repeat[0] % 2 == 0 else 0
+            self._repeat[1] -= 1 if self._repeat[1] % 2 == 0 else 0
         else:
-            l = list(map(int,re_repeat.match(self.repeat).groups()))
-            if(len(l) == 1):
-                l.extend([l[0],0])
-            elif(len(l) == 2):
-                l.append(1)
+            if len(self._repeat) == 1:
+                pass
+            elif len(self._repeat) == 2:
+                self._repeat.append(1)
             else:
                 print('repeat error')
-            repeat = l.copy()
 
-        return repeat
+    def getRepeat(self):
+        rrule = {'FREQ':'WEEKLY', 'INTERVAL':'', 'COUNT':''}
+        #从几周到几周，间隔几周
 
-    def getStart(self,area = 'Xueyuanlu'):
+        if len(self._repeat) >= 3:
+            rrule['INTERVAL'] = str(self._repeat[-1])
+            count = (self._repeat[1] - self._repeat[0]) / self._repeat[-1] + 1
+            rrule['COUNT'] = str(int(count))
+        else:
+            rrule = None
+
+        return rrule
+
+    def getStart(self, area='Xueyuanlu'):
         '''
         Return an arrow object
         '''
-        week_off = self.getRepeat()[0]
-        day_off  = self.time[0]
+        week_off = self._repeat[0] - 1
+        day_off = self.time[0]
         hour_off = self.time[1]
         if area == 'Xueyuanlu':
             start = session_begin_time.replace( \
-            weeks = +week_off,\
-            days =  +day_off,  \
-            hour = xueyuanlu_time[hour_off][0],\
-            minute = xueyuanlu_time[hour_off][1] )
-        elif area =='Shahe':
+            weeks=+week_off,\
+            days=+day_off,  \
+            hour=xueyuanlu_time[hour_off][0],\
+            minute=xueyuanlu_time[hour_off][1])
+        elif area == 'Shahe':
             start = session_begin_time.replace(\
-            weeks = +week_off,\
-            days = +day_off,  \
-            hour = shahe_time[hour_off][0],\
-            minute = shahe_time[hour_off][1] )
+            weeks=+week_off,\
+            days=+day_off,  \
+            hour=shahe_time[hour_off][0],\
+            minute=shahe_time[hour_off][1])
         return start.isoformat()
 
-    def getEnd(self,area = 'Xueyuanlu'):
-        week_off = self.getRepeat()[0]
-        day_off  = self.time[0]
-        if (len(sele.time) == 2):
+    def getEnd(self, area='Xueyuanlu'):
+        week_off = self._repeat[0] - 1
+        day_off = self.time[0]
+        if len(self.time) == 2:
             hour_off = self.time[1]
         else: hour_off = self.time[-1]
 
         if area == 'Xueyuanlu':
             stop = session_begin_time.replace(\
-            weeks =+ week_off,\
-            days =+ day_off,  \
-            hour = xueyuanlu_time[hour_off][0],\
-            minute = xueyuanlu_time[hour_off][1],\
-            minutes = +50 )  #下课时间加50min
-        elif area =='Shahe':
+            weeks=+week_off,\
+            days=+day_off,  \
+            hour=xueyuanlu_time[hour_off][0],\
+            minute=xueyuanlu_time[hour_off][1],\
+            minutes=+50)  #下课时间加50min
+        elif area == 'Shahe':
             start = session_begin_time.replace(\
-            weeks =+ week_off,\
-            days =+ day_off,  \
-            hour = shahe_time[hour_off][0],\
-            minute = shahe_time[hour_off][1],\
-            minutes = +50 )   #下课时间加50min
+            weeks=+week_off,\
+            days=+day_off,  \
+            hour=shahe_time[hour_off][0],\
+            minute=shahe_time[hour_off][1],\
+            minutes=+50 )   #下课时间加50min
         return stop.isoformat()
     
     def getLocation(self):
-        if self.class_room =='':
-            return False
-        else:
-            return self.class_room
+        return self.class_room
 
     def getDescription(self):
         pass
 
-    def getTeacher():
+    def getTeacher(self):
         return self.teacher
     
-path = input()
+path = '/Users/TimFan/Desktop/1.xls'
 
 data = xlrd.open_workbook(path)
 
@@ -150,13 +165,14 @@ class_info_list = []
 for i in range(2,9): #对应周一到周日
     celi_info_list = []
     celi_name_list = []
-    for j in rnage(2,8): #对应第一节到第十二节
+    for j in range(2,8): #对应第一节到第十二节
         raw = table.col_values(i)[j]
         if raw != '':
-            temp = re_celisplit(raw)
+            temp = re_celisplit.split(raw)
             celi_info = []
             for celi in temp:
-                re_resualt = re_class.match(celi).groupdict()
+                a = re_class.match(celi)
+                re_resualt = a.groupdict()
                 celi_info = ClassInfoHandle(i-2,j-2,re_resualt)
                 celi_info_list.append(celi_info)
                 celi_name = re_resualt['class_name']
@@ -194,9 +210,23 @@ calendar = ics.Calendar()
 eventlist = []
 
 for celi in class_info_list:
+    
     e = ics.Event()
+    rpt = celi.getRepeat()
+    e.rrule = rpt if rpt else None
     e.begin = celi.getStart()
     e.end = celi.getEnd()
+    e.name = celi.class_name
     e.location = celi.getLocation()
-    e.rrule = 0
+    e.description = celi.getTeacher()
+    calendar.events.append(e)
 
+
+    
+
+output_path = path[0:path.find('.')] + '.ics'
+
+with open(output_path,'a',encoding="utf-8") as f:
+    f.writelines(calendar)
+
+print('done')
