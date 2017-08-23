@@ -1,14 +1,8 @@
 import re, xlrd, ics, arrow
 
-
-v1 = r'(?P<class_name>[\w\（\）\(\)]+)◇(?P<teacher>[\w\s\，\,]*)\[(?P<repeat>[\w\-\－\，\,]+)\]◇?(?P<place_and_time>[\w\，\,\(,\),\（,\）]+)'
-re_class = re.compile(v1)
-
 v2 = r'[\,\，\s]+'
 re_timesplit = re.compile(v2)
 
-v3 = r'[\n\t|\<\/br\>]+'
-re_celisplit = re.compile(v3)
 
 v4 = r'(\d+)[\-\－]?(\d*)'
 re_repeat = re.compile(v4)
@@ -158,8 +152,18 @@ path = '/Users/TimFan/Desktop/1.xls'
 data = xlrd.open_workbook(path)
 
 table = data.sheets()[0]
-
-
+title = table.col_values(0)[0]
+if title.find('班级') == -1:
+    v1 = r'(?P<class_name>.*?)\<\/br\>(?P<teacher>.*?)\[(?P<repeat>[\w\-\－\，\,]+)\](?P<place_and_time>.*\n.*)'
+    v3 = r'(?<=节)\<\/br\>'
+    re_celisplit = re.compile(v3)
+    re_class = re.compile(v1)
+else:
+    v3 = r'[\n\t|\<\/br\>]+'
+    re_celisplit = re.compile(v3)
+    v1 = r'(?P<class_name>.*?)◇(?P<teacher>.*?)\[(?P<repeat>[\w\-\－\，\,]+)\]◇?(?P<place_and_time>[\w\，\,\-\－\(,\),\（,\）]+)'
+    re_class = re.compile(v1)
+    class_schedule = False
 class_info_list = []
 
 for i in range(2,9): #对应周一到周日
