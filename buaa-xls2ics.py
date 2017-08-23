@@ -1,4 +1,5 @@
 import re, xlrd, ics, arrow
+import logging
 
 v2 = r'[\,\，\s]+'
 re_timesplit = re.compile(v2)
@@ -147,6 +148,7 @@ class ClassInfoHandle:
     def getTeacher(self):
         return self.teacher
     
+
 path = '/Users/TimFan/Desktop/1.xls'
 
 data = xlrd.open_workbook(path)
@@ -175,12 +177,19 @@ for i in range(2,9): #对应周一到周日
             temp = re_celisplit.split(raw)
             celi_info = []
             for celi in temp:
-                a = re_class.match(celi)
-                re_resualt = a.groupdict()
-                celi_info = ClassInfoHandle(i-2,j-2,re_resualt)
-                celi_info_list.append(celi_info)
-                celi_name = re_resualt['class_name']
-                celi_name_list.append(celi_name)
+                try:
+                    a = re_class.match(celi)
+                    if a:
+                        re_resualt = a.groupdict()
+                        celi_info = ClassInfoHandle(i-2,j-2,re_resualt)
+                        celi_info_list.append(celi_info)
+                        celi_name = re_resualt['class_name']
+                        celi_name_list.append(celi_name)
+                    else:
+                        raise BaseException('Match Failed: match %s with pattern %s',celi,re_class)
+                except Exception as e:
+                    logging.exception(e)
+                    
 
     
     '''
@@ -232,5 +241,5 @@ output_path = path[0:path.find('.')] + '.ics'
 
 with open(output_path,'a',encoding="utf-8") as f:
     f.writelines(calendar)
-
+print(title)
 print('done')
